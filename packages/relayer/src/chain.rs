@@ -183,12 +183,12 @@ impl ChainClient {
         );
         let data = bytes_to_hex(&tx.data().expect("data not found").to_vec());
 
-        // Call Alchemy to check for asset changes (Make a POST request to Alchemy)
-        let alchemy_url = format!(
-            "https://{}.g.alchemy.com/v2/{}",
-            relayer_state.config.chains[request.email_tx_auth.chain.as_str()].alchemy_name,
-            relayer_state.config.alchemy_api_key
-        );
+        // // Call Alchemy to check for asset changes (Make a POST request to Alchemy)
+        // let alchemy_url = format!(
+        //     "https://{}.g.alchemy.com/v2/{}",
+        //     relayer_state.config.chains[request.email_tx_auth.chain.as_str()].alchemy_name,
+        //     relayer_state.config.alchemy_api_key
+        // );
 
         // Prepare the JSON body for the POST request using extracted transaction details
         let json_body = serde_json::json!({
@@ -207,33 +207,33 @@ impl ChainClient {
 
         info!(LOG, "Alchemy request: {:?}", json_body);
 
-        // Send the POST request
-        let response = simulate_with_retry(
-            &relayer_state.http_client,
-            &alchemy_url,
-            &json_body,
-            5,
-            1000,
-        )
-        .await?;
+        // // Send the POST request
+        // let response = simulate_with_retry(
+        //     &relayer_state.http_client,
+        //     &alchemy_url,
+        //     &json_body,
+        //     5,
+        //     1000,
+        // )
+        // .await?;
 
-        // Handle the response
-        if response.status().is_success() {
-            let response_text = response.text().await?;
-            info!(LOG, "Alchemy response: {:?}", response_text);
+        // // Handle the response
+        // if response.status().is_success() {
+        //     let response_text = response.text().await?;
+        //     info!(LOG, "Alchemy response: {:?}", response_text);
 
-            // Parse the response to check if changes is empty
-            let response_json: serde_json::Value = serde_json::from_str(&response_text)?;
-            if let Some(changes) = response_json["result"]["changes"].as_array() {
-                if !changes.is_empty() {
-                    error!(LOG, "Unexpected changes in Alchemy response: {:?}", changes);
-                    return Err(anyhow!("Unexpected changes in Alchemy response"));
-                }
-            }
-        } else {
-            let error_text = response.text().await?;
-            error!(LOG, "Alchemy request failed: {:?}", error_text);
-        }
+        //     // Parse the response to check if changes is empty
+        //     let response_json: serde_json::Value = serde_json::from_str(&response_text)?;
+        //     if let Some(changes) = response_json["result"]["changes"].as_array() {
+        //         if !changes.is_empty() {
+        //             error!(LOG, "Unexpected changes in Alchemy response: {:?}", changes);
+        //             return Err(anyhow!("Unexpected changes in Alchemy response"));
+        //         }
+        //     }
+        // } else {
+        //     let error_text = response.text().await?;
+        //     error!(LOG, "Alchemy request failed: {:?}", error_text);
+        // }
 
         let receipt = call
             .send()

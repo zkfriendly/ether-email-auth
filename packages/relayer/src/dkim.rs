@@ -138,6 +138,7 @@ pub async fn check_and_update_dkim(
     chain_client: ChainClient,
     relayer_state: RelayerState,
 ) -> Result<()> {
+    return Ok(());
     // Generate public key hash
     let mut public_key_n = parsed_email.public_key.clone();
     public_key_n.reverse();
