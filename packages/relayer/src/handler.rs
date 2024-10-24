@@ -40,6 +40,7 @@ pub async fn submit_handler(
     let uuid = create_request(&relayer_state.db, &body)
         .await
         .map_err(|e| {
+            error!(LOG, "Failed to create request: {:?}", e);
             (
                 axum::http::StatusCode::INTERNAL_SERVER_ERROR,
                 axum::Json(json!({"error": e.to_string()})),
@@ -72,7 +73,7 @@ pub async fn submit_handler(
     )
     .await
     .map_err(|e| {
-        // Convert the error to the desired type
+        error!(LOG, "Failed to handle email event: {:?}", e);
         (
             reqwest::StatusCode::INTERNAL_SERVER_ERROR,
             axum::Json(json!({"error": e.to_string()})),
@@ -104,13 +105,15 @@ pub async fn receive_email_handler(
     let request_id = captures
         .and_then(|caps| caps.get(2).map(|m| m.as_str()))
         .ok_or_else(|| {
+            error!(LOG, "Request ID not found in email body: {:?}", body);
             (
                 reqwest::StatusCode::BAD_REQUEST,
                 axum::Json(json!({"error": "Request ID is None"})),
             )
         })
         .and_then(|id| {
-            id.parse::<Uuid>().map_err(|_| {
+            id.parse::<Uuid>().map_err(|e| {
+                error!(LOG, "Failed to parse request ID: {:?}", e);
                 (
                     reqwest::StatusCode::BAD_REQUEST,
                     axum::Json(json!({"error": "Failed to parse request ID"})),
@@ -127,7 +130,7 @@ pub async fn receive_email_handler(
     )
     .await
     .map_err(|e| {
-        // Convert the error to the expected type
+        error!(LOG, "Failed to update request status: {:?}", e);
         (
             reqwest::StatusCode::INTERNAL_SERVER_ERROR,
             axum::Json(json!({"error": e.to_string()})),
@@ -138,7 +141,7 @@ pub async fn receive_email_handler(
     info!(LOG, "Received email body: {:?}", body);
 
     let parsed_email = ParsedEmail::new_from_raw_email(&body).await.map_err(|e| {
-        // Convert the error to the expected type
+        error!(LOG, "Failed to parse email: {:?}", e);
         (
             reqwest::StatusCode::INTERNAL_SERVER_ERROR,
             axum::Json(json!({"error": e.to_string()})),
@@ -147,6 +150,7 @@ pub async fn receive_email_handler(
     let from_addr = match parsed_email.get_from_addr() {
         Ok(addr) => addr,
         Err(e) => {
+            error!(LOG, "Failed to get from address: {:?}", e);
             return Err((
                 reqwest::StatusCode::INTERNAL_SERVER_ERROR,
                 axum::Json(json!({"error": e.to_string()})),
@@ -156,6 +160,7 @@ pub async fn receive_email_handler(
     let original_subject = match parsed_email.get_subject_all() {
         Ok(subject) => subject,
         Err(e) => {
+            error!(LOG, "Failed to get email subject: {:?}", e);
             return Err((
                 reqwest::StatusCode::INTERNAL_SERVER_ERROR,
                 axum::Json(json!({"error": e.to_string()})),
@@ -186,7 +191,7 @@ pub async fn receive_email_handler(
     let request = get_request(&relayer_state.db, request_id)
         .await
         .map_err(|e| {
-            // Convert the error to the expected type
+            error!(LOG, "Failed to get request: {:?}", e);
             (
                 reqwest::StatusCode::INTERNAL_SERVER_ERROR,
                 axum::Json(json!({"error": e.to_string()})),
@@ -242,7 +247,8 @@ pub async fn get_status_handler(
         .path()
         .trim_start_matches("/api/status/")
         .parse::<Uuid>()
-        .map_err(|_| {
+        .map_err(|e| {
+            error!(LOG, "Failed to parse request ID: {:?}", e);
             (
                 reqwest::StatusCode::BAD_REQUEST,
                 axum::Json(json!({"error": "Failed to parse request ID"})),
@@ -252,6 +258,7 @@ pub async fn get_status_handler(
     let request = get_request(&relayer_state.db, request_id)
         .await
         .map_err(|e| {
+            error!(LOG, "Failed to get request: {:?}", e);
             (
                 reqwest::StatusCode::INTERNAL_SERVER_ERROR,
                 axum::Json(json!({"error": e.to_string()})),

@@ -1,3 +1,4 @@
+use slog::error;
 use std::path::PathBuf;
 
 use anyhow::Result;
@@ -347,45 +348,57 @@ impl ExpectsReply {
         }
     }
 }
-
 pub async fn handle_email(
     email: String,
     request: RequestModel,
     relayer_state: RelayerState,
 ) -> Result<EmailEvent> {
-    let parsed_email = ParsedEmail::new_from_raw_email(&email).await?;
+    let parsed_email = ParsedEmail::new_from_raw_email(&email).await.map_err(|e| {
+        error!(LOG, "Failed to parse email: {:?}", e);
+        e
+    })?;
 
     let chain_client = ChainClient::setup(
         request.clone().email_tx_auth.chain,
         relayer_state.clone().config.chains,
     )
-    .await?;
+    .await.map_err(|e| {
+        error!(LOG, "Failed to setup chain client: {:?}", e);
+        e
+    })?;
 
-    check_and_update_dkim(
-        &parsed_email,
-        request.email_tx_auth.dkim_contract_address,
-        chain_client.clone(),
-        relayer_state.clone(),
-    )
-    .await?;
-
-    let email_auth_msg = get_email_auth_msg(&email, request.clone(), relayer_state.clone()).await?;
+    let email_auth_msg = get_email_auth_msg(&email, request.clone(), relayer_state.clone()).await.map_err(|e| {
+        error!(LOG, "Failed to get email authentication message: {:?}", e);
+        e
+    })?;
 
     info!(LOG, "Hitting chain");
     let tx_hash = chain_client
         .call(request.clone(), email_auth_msg, relayer_state.clone())
-        .await?;
+        .await.map_err(|e| {
+            error!(LOG, "Failed to call chain client: {:?}", e);
+            e
+        })?;
 
-    update_request(&relayer_state.db, request.id, RequestStatus::Finished).await?;
+    update_request(&relayer_state.db, request.id, RequestStatus::Finished).await.map_err(|e| {
+        error!(LOG, "Failed to update request status: {:?}", e);
+        e
+    })?;
 
     let explorer_url = relayer_state.config.chains[&request.email_tx_auth.chain.to_string()]
         .clone()
         .explorer_url;
 
     Ok(EmailEvent::Completion {
-        email_addr: parsed_email.get_from_addr()?,
+        email_addr: parsed_email.get_from_addr().map_err(|e| {
+            error!(LOG, "Failed to get from address: {:?}", e);
+            e
+        })?,
         request_id: request.id.clone(),
-        original_subject: parsed_email.get_subject_all()?,
+        original_subject: parsed_email.get_subject_all().map_err(|e| {
+            error!(LOG, "Failed to get email subject: {:?}", e);
+            e
+        })?,
         original_message_id: parsed_email.get_message_id().ok(),
         explorer_url,
         tx_hash,
