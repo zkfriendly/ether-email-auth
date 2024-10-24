@@ -93,6 +93,8 @@ pub async fn receive_email_handler(
     State(relayer_state): State<Arc<RelayerState>>,
     body: String,
 ) -> Result<impl IntoResponse, (StatusCode, Json<Value>)> {
+    info!(LOG, "Received email body: {:?}", body);
+
     // Define the regex pattern for UUID
     let uuid_regex = Regex::new(
         r"(Your request ID is )([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})",
@@ -138,7 +140,7 @@ pub async fn receive_email_handler(
     })?;
 
     // Log the received body
-    info!(LOG, "Received email body: {:?}", body);
+    info!(LOG, "Received email body");
 
     let parsed_email = ParsedEmail::new_from_raw_email(&body).await.map_err(|e| {
         error!(LOG, "Failed to parse email: {:?}", e);
@@ -157,6 +159,8 @@ pub async fn receive_email_handler(
             ))
         }
     };
+    info!(LOG, "From address: {:?}", from_addr);
+
     let original_subject = match parsed_email.get_subject_all() {
         Ok(subject) => subject,
         Err(e) => {
@@ -167,6 +171,7 @@ pub async fn receive_email_handler(
             ))
         }
     };
+    info!(LOG, "Original subject: {:?}", original_subject);
 
     // Send acknowledgment email
     match handle_email_event(
@@ -197,15 +202,21 @@ pub async fn receive_email_handler(
                 axum::Json(json!({"error": e.to_string()})),
             )
         })?;
+    info!(LOG, "Request: {:?}", request);
 
     // Process the email
     match handle_email(body, request, (*relayer_state).clone()).await {
-        Ok(event) => match handle_email_event(event, (*relayer_state).clone()).await {
-            Ok(_) => {}
-            Err(e) => {
-                error!(LOG, "Error handling email event: {:?}", e);
+        Ok(event) => {
+            info!(LOG, "Email handled successfully: {:?}", event);
+            match handle_email_event(event, (*relayer_state).clone()).await {
+                Ok(_) => {
+                    info!(LOG, "Email event handled successfully");
+                }
+                Err(e) => {
+                    error!(LOG, "Error handling email event: {:?}", e);
+                }
             }
-        },
+        }
         Err(e) => {
             error!(LOG, "Error handling email: {:?}", e);
             let original_subject = parsed_email
@@ -222,7 +233,9 @@ pub async fn receive_email_handler(
             )
             .await
             {
-                Ok(_) => {}
+                Ok(_) => {
+                    info!(LOG, "Error email event handled successfully");
+                }
                 Err(e) => {
                     error!(LOG, "Error handling email event: {:?}", e);
                 }
@@ -242,6 +255,8 @@ pub async fn get_status_handler(
     State(relayer_state): State<Arc<RelayerState>>,
     request: request::Parts,
 ) -> Result<impl IntoResponse, (StatusCode, Json<Value>)> {
+    info!(LOG, "Received status request: {:?}", request);
+
     let request_id = request
         .uri
         .path()
@@ -255,6 +270,8 @@ pub async fn get_status_handler(
             )
         })?;
 
+    info!(LOG, "Parsed request ID: {:?}", request_id);
+
     let request = get_request(&relayer_state.db, request_id)
         .await
         .map_err(|e| {
@@ -264,6 +281,8 @@ pub async fn get_status_handler(
                 axum::Json(json!({"error": e.to_string()})),
             )
         })?;
+
+    info!(LOG, "Request: {:?}", request);
 
     let response = json!({
         "message": "request status",
