@@ -2,7 +2,7 @@
   "port": 8000,
   "databaseUrl": "postgres://relayer:relayer_password@db:5432/relayer",
   "smtpUrl": "http://smtp_server_1:3000",
-  "proverUrl": "https://zkemail--email-auth-prover-v1-4-0-flask-app.modal.run",
+  "proverUrl": "https://zkemail--email-auth-prover-v1-5-4-flask-app.modal.run",
   "alchemyApiKey": "",
   "path": {
     "pem": "./.ic.pem",
